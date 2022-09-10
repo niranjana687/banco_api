@@ -1,3 +1,4 @@
+from turtle import update
 from flask import Flask, jsonify, request
 from flask_restful import Api, Resource
 from pymongo import Mongoclient
@@ -45,6 +46,23 @@ def getBalance(username):
     balance = users.find_one({"Username":username})[0]["Balance"]
     return balance
 
+def checkBalance(username, amount):
+    balance = getBalance(username)
+
+    if amount > balance:
+        return False
+
+    return True
+
+def updateBalance(username, amount):
+    current = getBalance(username)
+    users.update_one({
+        "Username":username
+    }, {
+        "$set": {
+            "Balance": current + amount
+        }
+    })
 # Register to the app
 class Register(Resource):
     def post(self):
@@ -72,8 +90,9 @@ class Register(Resource):
             "Debt": 0
         })
 
-        return generateReturnDictionary(200, "Registration successful")    
+        return generateReturnDictionary(200, "Registration successful")   
 
+# Add funds to your account
 class Add(Resource):
     def post(self):
         # get posted data
@@ -111,8 +130,56 @@ class Add(Resource):
 
         return generateReturnDictionary(200, "Successfully added funds")
 
+# Transfer money to another account
+class Transfer(Resource):
+    def post(self):
+        # get posted data
+        postedData = request.get_json()
+
+        # store username, password, amount, and receivers username
+        username = postedData["username"]
+        password = postedData["password"]
+        amount = postedData["amount"]
+        receiver = postedData["receiver"]
+
+        # verify login
+        verified = verifyLogin(username, password)
+
+        # send error code if verification fails
+        if not verified:
+            return generateReturnDictionary(303, "invalid login")
+        
+        # verify amount 
+        positive = checkAmount(amount)
+
+        # send error if verification fails
+        if not positive:
+            return generateReturnDictionary(304, "amount should be greater than zero")
+
+        # check if the user has sufficeint balance
+        suff_balance = checkBalance(username, amount)
+
+        # send error code if balance is insufficeint for transaction
+        if not suff_balance:
+            return generateReturnDictionary(305, "insufficient balance, try a lower amount or add funds")
+        
+        # verify username of receiver
+        user_exists = verifyUsername(receiver)
+
+        # send error code if verification fails
+        if not user_exists:
+            return generateReturnDictionary(301, "user does not exist. check username and try again")
+
+        # send success code and message if transfer is successful
+        transferred_amt = 0 - amount
+        updateBalance(username, transferred_amt)
+        updateBalance(receiver, amount)
+
+        return generateReturnDictionary(200, "Transaction successful")
+
 api.add_resource(Register, '/register')
 api.add_resource(Add, '/add')
+api.add_resource(Transfer, '/transfer')
 
 if __name__=="__main__":
     app.run('0.0.0.0', port=5000, debug=True)
