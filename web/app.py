@@ -63,6 +63,19 @@ def updateBalance(username, amount):
             "Balance": current + amount
         }
     })
+
+def updateDebt(username, loan):
+    debt = users.find_one({"Username": username})[0]["Debt"]
+
+    users.update_one({
+        "Username":username
+        }, 
+        {
+            "$set": {
+                "Debt": debt + loan
+            }
+        })
+        
 # Register to the app
 class Register(Resource):
     def post(self):
@@ -199,11 +212,44 @@ class Balance(Resource):
 
         return balance, generateReturnDictionary(200, "success")
 
+# take loan 
+class TakeLoan(Resource):
+    def post(self):
+        # get posted data
+        postedData = request.get_json()
+
+        # get username and password
+        username = postedData["username"]
+        password = postedData["password"]
+        loan = postedData["loan"]
+        # verify login
+        verified = verifyLogin(username, password)
+
+        # send error code if unverified
+        if not verified:
+            return generateReturnDictionary(303, "invalid login")
+
+        # check if loan amount is positive
+        positive = checkAmount(loan)
+
+        # send error code if not positve 
+        if not positive:
+            return generateReturnDictionary(304, "amount should be greater than zero")
+        
+        # update balance with amount
+        updateBalance(username, loan)
+
+        # update debt of user
+        updateDebt(username, loan)
+
+        # send success code
+        return generateReturnDictionary(200, "loan granted")
         
 api.add_resource(Register, '/register')
 api.add_resource(Add, '/add')
 api.add_resource(Transfer, '/transfer')
 api.add_resource(Balance, 'balance')
+api.add_resource(TakeLoan, '/takeloan')
 
 if __name__=="__main__":
     app.run('0.0.0.0', debug=True)
