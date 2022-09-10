@@ -171,15 +171,39 @@ class Transfer(Resource):
             return generateReturnDictionary(301, "user does not exist. check username and try again")
 
         # send success code and message if transfer is successful
-        transferred_amt = 0 - amount
+        transferred_amt = 0 - amount 
         updateBalance(username, transferred_amt)
         updateBalance(receiver, amount)
 
         return generateReturnDictionary(200, "Transaction successful")
 
+# check account balance
+class Balance(Resource):
+    def post(self):
+        # get posted data
+        postedData = request.get_json()
+
+        # get username and password
+        username = postedData["username"]
+        password = postedData["password"]
+
+        # verify login
+        verified = verifyLogin(username, password)
+
+        # verification fails send error code
+        if not verified:
+            return generateReturnDictionary(303, "invalid login")
+
+        # return success code wtih balance
+        balance = getBalance(username)
+
+        return balance, generateReturnDictionary(200, "success")
+
+        
 api.add_resource(Register, '/register')
 api.add_resource(Add, '/add')
 api.add_resource(Transfer, '/transfer')
+api.add_resource(Balance, 'balance')
 
 if __name__=="__main__":
-    app.run('0.0.0.0', port=5000, debug=True)
+    app.run('0.0.0.0', debug=True)
