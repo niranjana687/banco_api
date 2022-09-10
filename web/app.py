@@ -1,4 +1,3 @@
-from turtle import update
 from flask import Flask, jsonify, request
 from flask_restful import Api, Resource
 from pymongo import Mongoclient
@@ -75,7 +74,10 @@ def updateDebt(username, loan):
                 "Debt": debt + loan
             }
         })
-        
+def getDebt(username):
+    debt = users.find_one({"Username":username})[0]["Debt"]
+    return debt
+
 # Register to the app
 class Register(Resource):
     def post(self):
@@ -244,12 +246,59 @@ class TakeLoan(Resource):
 
         # send success code
         return generateReturnDictionary(200, "loan granted")
-        
+
+# Pay Loan
+class PayLoan(Resource):
+    def post(self):
+        # get posted data
+        postedData = request.get_json()
+
+        # get username password and amount payable
+        username = postedData["username"]
+        password = postedData["password"]
+        amount = postedData["amount"]
+
+        # verify login
+        verified = verifyLogin(username, password)
+
+        # return error code if verification fails
+        if not verified:
+            return generateReturnDictionary(303, "invalid login")
+    
+        # verify amount
+        positive = checkAmount(amount)
+
+        # return error code if amount is not positive
+        if not positive:
+            return generateReturnDictionary(304, "amount should be greater than zero")
+
+        # check if the amount is more than the debt
+        # return error code if more
+        if amount > getDebt(username):
+            return generateReturnDictionary(306, "amount is more than debt, try again")
+
+        # check if the user has sufficient balance to pay
+        # return error code if balance is insufficient
+        if amount > getBalance(username)
+            return generateReturnDictionary(305, "insufficient funds")
+    
+        # update debt
+        new_debt = 0 - amount
+        updateDebt(username, new_debt)
+
+        # update balance
+        withdrawal = 0 - amount
+        updateBalance(username, withdrawal)
+
+        # send success code
+        return generateReturnDictionary(200, "debt paid successfully")
+
 api.add_resource(Register, '/register')
 api.add_resource(Add, '/add')
 api.add_resource(Transfer, '/transfer')
 api.add_resource(Balance, 'balance')
 api.add_resource(TakeLoan, '/takeloan')
+api.add_resource(PayLoan, '/payloan')
 
 if __name__=="__main__":
     app.run('0.0.0.0', debug=True)
